@@ -1,0 +1,24 @@
+#!/usr/bin/env zsh
+
+
+###########################
+###  build the wasm part
+###########################
+
+source ${DEMO_root_DIR}/repo/emsdk/emsdk_env.sh
+
+pushd $DEMO_root_DIR/build
+
+	build_dir=$DEMO_root_DIR/build/wasm32
+	source_dir=$DEMO_root_DIR/repo/libjxl
+
+	if [[ -d ${build_dir} ]]
+	then
+		rm -rf ${build_dir}
+	fi
+
+	pushd ${source_dir}
+		BUILD_TARGET=wasm32 BUILD_DIR=$build_dir SKIP_TEST=1 ENABLE_WASM_SIMD=1 emconfigure ./ci.sh release
+	popd
+	
+popd

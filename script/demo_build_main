@@ -1,0 +1,22 @@
+#!/usr/bin/env zsh
+
+############################
+###  build the C/C++ part
+############################
+
+pushd $DEMO_root_DIR/build
+	build_dir=$DEMO_root_DIR/build/main
+	source_dir=$DEMO_root_DIR/repo/libjxl
+
+	if [[ -d $build_dir ]]
+	then
+		rm -rf $build_dir
+	fi
+
+	mkdir ${build_dir}
+
+	pushd ${build_dir}
+		cmake -DCMAKE_CXX_FLAGS="-march=native -mtune=native" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF $source_dir
+		cmake --build . -- -j$(nproc)
+	popd
+popd

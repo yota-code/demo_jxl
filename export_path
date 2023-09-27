@@ -1,0 +1,11 @@
+
+export DEMO_root_DIR="${0:A:h}"
+
+export PATH=$DEMO_root_DIR/script:$DEMO_root_DIR/build/main/tools:$PATH
+
+echo $DEMO_root_DIR
+
+typeset -U PATH
+
+rehash
+

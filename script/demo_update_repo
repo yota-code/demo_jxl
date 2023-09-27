@@ -1,0 +1,26 @@
+#!/usr/bin/env zsh
+
+pushd $DEMO_root_DIR/repo
+	if [[ ! -d libjxl ]]
+	then
+		git clone --recurse-submodules https://github.com/libjxl/libjxl.git
+	else
+		pushd libjxl
+			git stash
+			git pull --recurse-submodule
+			git stash pop
+			git diff
+		popd
+	fi
+		
+	if [[ ! -d emsdk ]]
+	then
+		git clone --recurse-submodules https://github.com/emscripten-core/emsdk.git
+	else
+		pushd emsdk
+			git pull --recurse-submodule
+			./emsdk install latest
+			./emsdk activate latest
+		popd
+	fi
+popd
