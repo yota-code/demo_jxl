@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>versus</title>
+
+	<style>
+.parent {
+  position: relative;
+  width:512px;
+  height:512px;
+}
+.imgref {
+  position: relative;
+  top: 0px;
+  left: 0px;
+}
+
+.imgovr {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+}
+
+input[type=button]:hover {
+	background-color: #f00; 
+}
+
+	</style>
+	<!--<link rel="stylesheet" href="style.css">
+	<script src="script.js"></script>-->
+</head>
+<body style="background-color:#444;width:100%;">
+<div style="margin:0 auto;text-align: center;">
+
+	<input id="img_one" type="button" value="one" style="border: 1px solid black ; margin:0 0;width:5em"/><input id="img_two" type="button" value="two" style="border: 1px solid black ; margin:0 0;;width:5em"/>
+
+	<p>
+	<canvas id="screen" width="384px" height="384px" style="image-rendering:pixelated;border: 32px solid black;"></canvas>
+	</p>
+</div>
+
+</body>
+
+<script>
+
+const query = new URLSearchParams(window.location.search);
+
+var cvn = document.getElementById('screen');
+var ctx = cvn.getContext('2d');
+
+var btnA = document.getElementById('img_one');
+var btnB = document.getElementById('img_two');
+
+var [imgZ, imgA, imgB, imgW, imgH] = [null, null, null, null, null];
+var [rndX, rndY] = [0, 0];
+
+btnA.onmouseenter = (() => {
+	if (imgA !== null) {
+		ctx.drawImage(imgA, rndX, rndY, 192, 192, 0, 0, 384, 384);
+	}
+});
+
+btnA.onmouseout = (() => {
+	if (imgZ !== null) {
+		ctx.drawImage(imgZ, rndX, rndY, 192, 192, 0, 0, 384, 384);
+	}
+});
+
+btnA.onclick = (() => {
+	if (imgA !== null) {
+		score[w ? 'A' : 'B'] += 1;
+		next_slide();
+	}
+});
+
+btnB.onmouseenter = (() => {
+	if (imgB !== null) {
+		ctx.drawImage(imgB, rndX, rndY, 192, 192, 0, 0, 384, 384);
+	}
+});
+
+btnB.onmouseout= (() => {
+	if (imgZ !== null) {
+		ctx.drawImage(imgZ, rndX, rndY, 192, 192, 0, 0, 384, 384);
+	}
+});
+
+btnB.onclick = (() => {
+	if (imgB !== null) {
+		score[w ? 'B' : 'A'] += 1;
+		next_slide();
+	}
+});
+
+
+function loadImage(url) {
+	return new Promise(resolve => {
+		let i = new Image();
+		i.onload = (() => { resolve(i) });
+		i.src = url;
+	});
+}
+
+function getRandomInt(a, b) {
+	// return an int in a..b (both bounds included)
+	return Math.floor(Math.random() * (b - a + 1)) + a;
+}
+
+var versus_A = query.get("A");
+var versus_B = query.get("B");
+
+var i_start = Number(query.get("start"));
+var i_stop = Number(query.get("stop"));
+
+var [n, m, w] = [null, null, null];
+
+var score = {
+	'A' : 0,
+	'B' : 0,
+};
+
+function next_slide() {
+	n = getRandomInt(i_start, i_stop);
+	m = String(n).padStart(2, '0');
+	w = getRandomInt(0, 1);
+
+	console.log(w, score);
+
+	loadImage(`ref/${m}.png`).then((img) => {
+		[imgZ, imgW, imgH] = [img, img.naturalWidth, img.naturalHeight];
+		[rndX, rndY] = [getRandomInt(0, imgW - 192), getRandomInt(0, imgH - 192)];
+		ctx.drawImage(img, rndX, rndY, 192, 192, 0, 0, 384, 384);
+	});
+	
+	Promise.all([loadImage(`${versus_A}/${m}.png`), loadImage(`${versus_B}/${m}.png`)]).then((img_lst) => {
+		if (w != 0) {
+			[imgA, imgB] = img_lst;
+		} else {
+			[imgB, imgA] = img_lst;
+		}
+	});
+
+}
+
+next_slide();
+
+</script>
+</html>
