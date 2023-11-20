@@ -3,8 +3,8 @@
 <head>
 	<meta charset="utf-8">
 	<title>versus</title>
-
 	<style>
+
 .parent {
   position: relative;
   width:512px;
@@ -22,22 +22,34 @@
   left: 0px;
 }
 
+input[type=button] {
+	border: 1px solid black;
+	margin:0 0;
+	width:5em;
+	height:3em;
+}
+
 input[type=button]:hover {
 	background-color: #f00; 
 }
 
+canvas {
+	image-rendering:pixelated;
+	border: 32px solid black;
+}
+
 	</style>
-	<!--<link rel="stylesheet" href="style.css">
-	<script src="script.js"></script>-->
 </head>
-<body style="background-color:#444;width:100%;">
-<div style="margin:0 auto;text-align: center;">
-
-	<input id="img_one" type="button" value="one" style="border: 1px solid black ; margin:0 0;width:5em"/><input id="img_two" type="button" value="two" style="border: 1px solid black ; margin:0 0;;width:5em"/>
-
+<body style="background-color:#444;">
+<div style="text-align:center;">
 	<p>
-	<canvas id="screen" width="384px" height="384px" style="image-rendering:pixelated;border: 32px solid black;"></canvas>
+		<canvas id="screen" width="384px" height="384px"></canvas>
 	</p>
+	<input id="img_one" type="button" value="one"/><input id="img_two" type="button" value="two"/>
+	<ul>
+		<li><span id="versus_A"></span>: <span id="score_A"></span></li>
+		<li><span id="versus_B"></span>: <span id="score_B"></span></li>
+	</ul>
 </div>
 
 </body>
@@ -69,7 +81,7 @@ btnA.onmouseout = (() => {
 
 btnA.onclick = (() => {
 	if (imgA !== null) {
-		score[w ? 'A' : 'B'] += 1;
+		score[w] += 1;
 		next_slide();
 	}
 });
@@ -88,11 +100,10 @@ btnB.onmouseout= (() => {
 
 btnB.onclick = (() => {
 	if (imgB !== null) {
-		score[w ? 'B' : 'A'] += 1;
+		score[1 - w] += 1;
 		next_slide();
 	}
 });
-
 
 function loadImage(url) {
 	return new Promise(resolve => {
@@ -110,36 +121,42 @@ function getRandomInt(a, b) {
 var versus_A = query.get("A");
 var versus_B = query.get("B");
 
+document.getElementById('versus_A').innerText = versus_A;
+document.getElementById('versus_B').innerText = versus_B;
+
 var i_start = Number(query.get("start"));
 var i_stop = Number(query.get("stop"));
 
 var [n, m, w] = [null, null, null];
 
-var score = {
-	'A' : 0,
-	'B' : 0,
-};
+var score = [0, 0];
 
 function next_slide() {
 	n = getRandomInt(i_start, i_stop);
-	m = String(n).padStart(2, '0');
+	m = String(n).padStart(4, '0');
 	w = getRandomInt(0, 1);
 
-	console.log(w, score);
+	console.log(n, `img/__ref__/${m}.png`, w);
 
-	loadImage(`ref/${m}.png`).then((img) => {
+	loadImage(`img/__ref__/${m}.png`).then((img) => {
 		[imgZ, imgW, imgH] = [img, img.naturalWidth, img.naturalHeight];
 		[rndX, rndY] = [getRandomInt(0, imgW - 192), getRandomInt(0, imgH - 192)];
 		ctx.drawImage(img, rndX, rndY, 192, 192, 0, 0, 384, 384);
 	});
 	
-	Promise.all([loadImage(`${versus_A}/${m}.png`), loadImage(`${versus_B}/${m}.png`)]).then((img_lst) => {
+	Promise.all([
+		loadImage(`img/${versus_A}/${m}.png`),
+		loadImage(`img/${versus_B}/${m}.png`)
+	]).then((img_lst) => {
 		if (w != 0) {
 			[imgA, imgB] = img_lst;
 		} else {
 			[imgB, imgA] = img_lst;
 		}
 	});
+
+	document.getElementById('score_A').innerText = score[0];
+	document.getElementById('score_B').innerText = score[1];
 
 }
 
