@@ -4,9 +4,16 @@
 ###  build the C/C++ part
 ############################
 
-pushd $DEMO_root_DIR/build
-	build_dir=$DEMO_root_DIR/build/main
-	source_dir=$DEMO_root_DIR/repo/libjxl
+pushd $JXL_root_DIR/build
+
+	if [[ ! -z $1 ]]
+	then
+		build_dir=$JXL_root_DIR/build/native_$1
+		source_dir=$JXL_root_DIR/repo/libjxl_$1
+	else
+		build_dir=$JXL_root_DIR/build/native
+		source_dir=$JXL_root_DIR/repo/libjxl
+	fi
 
 	if [[ -d $build_dir ]]
 	then

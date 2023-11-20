@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 
-pushd $DEMO_root_DIR/repo
+pushd $JXL_root_DIR/repo
 	if [[ ! -d libjxl ]]
 	then
 		git clone --recurse-submodules https://github.com/libjxl/libjxl.git

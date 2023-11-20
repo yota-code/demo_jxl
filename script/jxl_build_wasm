@@ -5,12 +5,12 @@
 ###  build the wasm part
 ###########################
 
-source ${DEMO_root_DIR}/repo/emsdk/emsdk_env.sh
+source ${JXL_root_DIR}/repo/emsdk/emsdk_env.sh
 
-pushd $DEMO_root_DIR/build
+pushd $JXL_root_DIR/build
 
-	build_dir=$DEMO_root_DIR/build/wasm32
-	source_dir=$DEMO_root_DIR/repo/libjxl
+	build_dir=$JXL_root_DIR/build/wasm32
+	source_dir=$JXL_root_DIR/repo/libjxl
 
 	if [[ -d ${build_dir} ]]
 	then
