@@ -6,12 +6,15 @@
 
 pushd $JXL_root_DIR/build
 
-	if [[ ! -z $1 ]]
+	# $1 native or generic
+	# $2 commit number, HEAD is used if none
+
+	if [[ ! -z $2 ]]
 	then
-		build_dir=$JXL_root_DIR/build/native_$1
-		source_dir=$JXL_root_DIR/repo/libjxl_$1
+		build_dir=$JXL_root_DIR/build/libjxl_$1_$2
+		source_dir=$JXL_root_DIR/repo/libjxl_$2
 	else
-		build_dir=$JXL_root_DIR/build/native
+		build_dir=$JXL_root_DIR/build/libjxl_$1
 		source_dir=$JXL_root_DIR/repo/libjxl
 	fi
 
@@ -23,7 +26,20 @@ pushd $JXL_root_DIR/build
 	mkdir ${build_dir}
 
 	pushd ${build_dir}
-		cmake -DCMAKE_CXX_FLAGS="-march=native -mtune=native" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF $source_dir
+		case $1 in 
+			'native')
+				cmake -DCMAKE_CXX_FLAGS="-O3 -march=native -mtune=native" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF $source_dir
+				;;
+			'generic')
+				cmake -DCMAKE_CXX_FLAGS="-march=x86-64 -mtune=generic" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF $source_dir
+				;;
+			*)
+				echo "you must specify native or generic"
+				return 1
+				;;
+		esac
+		
 		cmake --build . -- -j$(nproc)
 	popd
+
 popd

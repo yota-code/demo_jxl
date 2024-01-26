@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+
+import ast
+import collections
+import os
+import sys
+import tempfile
+
+from cc_pathlib import Path
+
+jxl_root_dir = Path(os.environ['JXL_root_DIR'])
+lossless_dir = jxl_root_dir / "benchmark" / "lossless"
+
+class ToolEct() :
+	def __init__(self, pth, res) :
+		self.pth = pth.resolve()
+
+		ret = Path().run(self.pth, '-help')
+		txt = ret.stdout.splitlines()
+
+		self.ver = txt[2]
+		self.res = res
+
+	def run(self, pth, * arg_lst) :
+		with tempfile.TemporaryDirectory('ect', 'jxl') as cwd :
+			tmp = Path(cwd)
+			src = tmp / "src.png"
+			for i in range(10) :
+				src.write_bytes(pth.read_bytes())
+				src_size = src.stat().st_size
+				cmd = [f'-{i}', '-strip', '--mt-deflate=3']
+				# ret = tmp.run('/usr/bin/time', '-f', '[%e,]', self.pth, f'-{i}', '-strip', '--allfilters-b', '--mt-file=3', tmp / "original.png")
+				ret = tmp.run('/usr/bin/time', '-f', '[%e, %U, %M, %P]', self.pth, * cmd, src)
+				dst_size = src.stat().st_size
+				time = ast.literal_eval(ret.stderr.decode('utf8').strip().replace('%', ''))
+				time[-1] /= 100.0
+				self.res['ect'][f"{self.ver}\nect {' '.join(cmd)}"] = time
+				print(src_size, dst_size, dst_size / src_size, ret.stdout, )
+
+
+class ToolPingo() :
+	def __init__(self, pth, res) :
+		self.pth = pth.resolve()
+
+		ret = Path().run(self.pth, '-help')
+		txt = ret.stdout.splitlines()
+
+		print(txt)
+
+		self.ver = txt[2]
+		self.res = res
+
+	def run(self, pth, * arg_lst) :
+		with tempfile.TemporaryDirectory('ect', 'jxl') as cwd :
+			tmp = Path(cwd)
+			src = tmp / "src.png"
+			for i in range(10) :
+				src.write_bytes(pth.read_bytes())
+				src_size = src.stat().st_size
+				cmd = ['-srgb', '-s4']
+				ret = tmp.run('/usr/bin/time', '-f', '[%e, %U, %M, %P]', 'wine', self.pth, * cmd, src)
+				dst_size = src.stat().st_size
+				time = ast.literal_eval(ret.stderr.decode('utf8').strip().replace('%', ''))
+				time[-1] /= 100.0
+				self.res['ect'][f"{self.ver}\nect {' '.join(cmd)}"] = time
+				print(src_size, dst_size, dst_size / src_size, ret.stdout, )
+
+class ToolZopfli() :
+	def __init__(self, pth, res) :
+		self.pth = pth.resolve()
+
+		ret = Path().run(self.pth, '-help')
+		txt = ret.stdout.splitlines()
+
+		print(txt)
+
+		self.ver = txt[2]
+		self.res = res
+
+	def run(self, pth, * arg_lst) :
+		with tempfile.TemporaryDirectory('ect', 'jxl') as cwd :
+			tmp = Path(cwd)
+			src = tmp / "src.png"
+			for i in range(10) :
+				src.write_bytes(pth.read_bytes())
+				src_size = src.stat().st_size
+				cmd = ['-srgb', '-s4']
+				ret = tmp.run('/usr/bin/time', '-f', '[%e, %U, %M, %P]', 'wine', self.pth, * cmd, src)
+				dst_size = src.stat().st_size
+				time = ast.literal_eval(ret.stderr.decode('utf8').strip().replace('%', ''))
+				time[-1] /= 100.0
+				self.res['ect'][f"{self.ver}\nect {' '.join(cmd)}"] = time
+				print(src_size, dst_size, dst_size / src_size, ret.stdout, )
+
+class LossLessBench() :
+	def __init__(self) :
+		self.res = dict()
+		self.res_pth = lossless_dir / "result.json"
+		if self.res_pth.is_file() :
+			self.res_map = self.res_pth.load()
+		else :
+			self.res_map = collections.defaultdict(dict)
+
+		self.exe = dict()
+		self.exe['ect'] = ToolEct(jxl_root_dir / "build" / "ect" / "ect", self.res_map)
+		self.exe['pingo'] = ToolPingo(jxl_root_dir / "build" / "pingo" / "pingo")
+
+	def save(self) :
+		self.res_pth.save(self.res_map)
+
+if __name__ == '__main__' :
+	u = LossLessBench()
+	u.exe['ect'].run(Path(sys.argv[1]))
+	u.save()

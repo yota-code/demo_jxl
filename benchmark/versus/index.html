@@ -16,6 +16,15 @@
   left: 0px;
 }
 
+table {
+ border-collapse:collapse;
+ border: 1px solid white;
+}
+
+td {
+  padding: 0.5em 2em;
+}
+
 .imgovr {
   position: absolute;
   top: 0px;
@@ -46,10 +55,10 @@ canvas {
 		<canvas id="screen" width="384px" height="384px"></canvas>
 	</p>
 	<input id="img_one" type="button" value="one"/><input id="img_two" type="button" value="two"/>
-	<ul>
-		<li><span id="versus_A"></span>: <span id="score_A"></span></li>
-		<li><span id="versus_B"></span>: <span id="score_B"></span></li>
-	</ul>
+	<table style="margin:0.5em auto">
+		<tr><td id="versus_A"></td><td id="score_A"></td></tr>
+		<tr><td id="versus_B"></td><td id="score_B"></td></tr>
+	</table>
 </div>
 
 </body>
