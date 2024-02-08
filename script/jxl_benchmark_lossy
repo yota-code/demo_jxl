@@ -24,7 +24,7 @@ speed_lst = [
 	"tortoise"
 ]
 
-benchmark_exe = jxl_root_dir / "build" / "libjxl_native" / "tools" / "benchmark_xl"
+benchmark_exe = jxl_root_dir / "root" / "bin" / "benchmark_xl"
 
 # max norm is butteraugli, pnorm is the 3-norm butteraugli
 #Encoding              kPixels    Bytes          BPP  E MP/s  D MP/s     Max norm  SSIMULACRA2   PSNR        pnorm       BPP*pnorm   QABPP   Bugs
@@ -80,23 +80,57 @@ while a_lst :
 	)
 
 import numpy as np
+import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
+if False :
+	fig = plt.figure()
+	ax = fig.add_subplot(projection='3d')
 
-for k in ['avif', 'jxl'] :
-	x_lst, y_lst, z_lst = list(), list(), list()
-	for key, score in r_map.items() :
-		if key.startswith(k) :
-			x_lst.append(score.bpp)
-			y_lst.append(score.enc_spd)
-			z_lst.append(score.ssimulacra2)
-	print(len(x_lst))
-	ax.scatter(x_lst, y_lst, z_lst)
+	for k in ['avif', 'jxl'] :
+		x_lst, y_lst, z_lst = list(), list(), list()
+		for key, score in r_map.items() :
+			if key.startswith(k) :
+				x_lst.append(score.bpp)
+				y_lst.append(score.enc_spd)
+				z_lst.append(score.ssimulacra2)
+		print(len(x_lst))
+		ax.scatter(x_lst, y_lst, z_lst)
 
-ax.set_xlabel('bpp')
-ax.set_ylabel('enc_spd')
-ax.set_zlabel('ssimulacra2')
+	ax.set_xlabel('bpp')
+	ax.set_ylabel('enc_spd')
+	ax.set_zlabel('ssimulacra2')
 
-plt.show()
+	plt.show()
+
+if True :
+	fig = plt.figure()
+	ax = fig.add_subplot(projection='3d')
+	for k in ['avif', 'jxl'] :
+		x_lst, y_lst, z_lst = list(), list(), list()
+		for key, score in r_map.items() :
+			if key.startswith(k) :
+				x_lst.append(score.bpp)
+				y_lst.append(score.enc_spd)
+				z_lst.append(score.ssimulacra2)
+		ax.plot_trisurf(x_lst, y_lst, z_lst, alpha=0.7)
+	ax.set_xlabel('bpp')
+	ax.set_ylabel('enc_spd')
+	ax.set_zlabel('ssimulacra2')
+
+	plt.show()
+
+
+if False :
+	p_lst = list()
+	for k, c in [('avif', 'orange'), ('jxl', 'blue')] :
+		x_lst, y_lst, z_lst = list(), list(), list()
+		for key, score in r_map.items() :
+			if key.startswith(k) :
+				x_lst.append(score.bpp)
+				y_lst.append(score.enc_spd)
+				z_lst.append(score.ssimulacra2)
+		p_lst.append(go.Mesh3d(x=x_lst, y=y_lst, z=z_lst, color=c))
+	fig = go.Figure(data=p_lst)
+	fig.show()
+		

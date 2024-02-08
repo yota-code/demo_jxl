@@ -1,7 +1,13 @@
+#!/usr/bin/env zsh
 
 export JXL_root_DIR="${0:A:h}"
 
-export PATH=$JXL_root_DIR/script:$JXL_root_DIR/build/main/tools:$PATH
+export PREFIX_DIR=${JXL_root_DIR}/root
+
+export PATH=${JXL_root_DIR}/script:${PREFIX_DIR}/bin:$PATH
+export LD_LIBRARY_PATH=${PREFIX_DIR}/lib:$LD_LIBRARY_PATH
+
+export PKG_CONFIG_PATH=${PREFIX_DIR}/lib/pkgconfig
 
 echo $JXL_root_DIR
 
