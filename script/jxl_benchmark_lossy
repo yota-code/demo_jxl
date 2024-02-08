@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+
+import ast
+import base64
+import collections
+import hashlib
+import os
+import sys
+import tempfile
+
+from cc_pathlib import Path
+
+jxl_root_dir = Path(os.environ['JXL_root_DIR'])
+
+speed_lst = [
+	"lightning",
+	"thunder",
+	"falcon",
+	"cheetah",
+	"hare",
+	"wombat",
+	"squirrel",
+	"kitten",
+	"tortoise"
+]
+
+benchmark_exe = jxl_root_dir / "build" / "libjxl_native" / "tools" / "benchmark_xl"
+
+# max norm is butteraugli, pnorm is the 3-norm butteraugli
+#Encoding              kPixels    Bytes          BPP  E MP/s  D MP/s     Max norm  SSIMULACRA2   PSNR        pnorm       BPP*pnorm   QABPP   Bugs
+Score = collections.namedtuple("Score", ['pixel_count', 'bytes', 'bpp', 'enc_spd', 'dec_spd', 'butteraugli', 'ssimulacra2', 'psnr', 'butteraugli3', 'pnorm_bpp', 'qa_bpp', 'bugs'])
+
+fnm = Path(sys.argv[1])
+hsh = base64.urlsafe_b64encode(hashlib.blake2b(fnm.read_bytes(), digest_size=24, salt=b'jxl').digest())
+
+pth = Path("result.tsv")
+r_map = dict()
+if pth.is_file() :
+	for key, * s_lst in pth.load() :
+		r_map[key] = Score(* [ast.literal_eval(s) for s in s_lst])
+
+c_lst = list()
+for effort in speed_lst :
+	for distance in [0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0] :
+		arg = f"jxl:d{distance}:{effort}"
+		key = f"{arg}@{hsh}"
+		if key not in r_map :
+			c_lst.append(arg)
+for speed in range(10) :
+	for quality in [100, 99, 98, 97, 96, 95, 94, 92, 90, 88, 86, 84, 80, 76, 72, 68, 64, 60] :
+		arg = f"avif:q{quality}:s{speed}"
+		key = f"{arg}@{hsh}"
+		if key not in r_map :
+			c_lst.append(arg)
+
+a_lst = c_lst[:8]
+while a_lst :
+	ret = Path().run(benchmark_exe, "--codec=" + ','.join(a_lst), f"--input={fnm}")
+	res = ret.stdout.decode('utf8')
+
+	is_result = False
+	for line in res.splitlines() :
+		if line.startswith('----') :
+			is_result = True
+			continue
+		if line.startswith("Aggregate:") :
+			break
+		if is_result :
+			s_lst = line.split()
+			arg = s_lst.pop(0)
+			key = f"{arg}@{hsh}"
+			s_lst = [ast.literal_eval(s) for s in s_lst]
+			r_map[key] = Score(* s_lst)
+
+	a_lst = c_lst[:8]
+	c_lst = c_lst[8:]
+
+	pth.save(
+		[[key,] + list(r_map[key]) for key in sorted(r_map)]
+	)
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+
+for k in ['avif', 'jxl'] :
+	x_lst, y_lst, z_lst = list(), list(), list()
+	for key, score in r_map.items() :
+		if key.startswith(k) :
+			x_lst.append(score.bpp)
+			y_lst.append(score.enc_spd)
+			z_lst.append(score.ssimulacra2)
+	print(len(x_lst))
+	ax.scatter(x_lst, y_lst, z_lst)
+
+ax.set_xlabel('bpp')
+ax.set_ylabel('enc_spd')
+ax.set_zlabel('ssimulacra2')
+
+plt.show()
