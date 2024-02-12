@@ -4,6 +4,7 @@ import ast
 import base64
 import collections
 import hashlib
+import math
 import os
 import sys
 import tempfile
@@ -12,17 +13,39 @@ from cc_pathlib import Path
 
 jxl_root_dir = Path(os.environ['JXL_root_DIR'])
 
-speed_lst = [
-	"lightning",
-	"thunder",
-	"falcon",
-	"cheetah",
-	"hare",
-	"wombat",
-	"squirrel",
-	"kitten",
-	"tortoise"
-]
+class JxlBench() :
+	effort_lst = [
+		"lightning",
+		"thunder",
+		"falcon",
+		"cheetah",
+		"hare",
+		"wombat",
+		"squirrel",
+		"kitten",
+		"tortoise",
+		"glacier"
+	]
+
+	def __init__(self, distance, effort) :
+		self.distance = float(distance)
+		self.effort = int(effort)
+
+		assert 0 <= self.effort < len(self.effort_lst)
+
+	def __str__(self) :
+		return f"jxl:d{self.distance}:{self.effort_lst[self.effort]}"
+
+class AvifBench() :
+	def __init__(self, quality, speed) :
+		self.quality = int(quality)
+		self.speed = int(speed)
+		
+		assert 0 <= quality <= 100
+		assert 0 <= speed <= 10
+
+	def __str__(self) :
+		return f"avif:q{self.quality}:{self.speed}"
 
 benchmark_exe = jxl_root_dir / "root" / "bin" / "benchmark_xl"
 
@@ -40,14 +63,14 @@ if pth.is_file() :
 		r_map[key] = Score(* [ast.literal_eval(s) for s in s_lst])
 
 c_lst = list()
-for effort in speed_lst :
-	for distance in [0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0] :
+for effort in effort_lst :
+	for distance in [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.4, 1.5, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] :
 		arg = f"jxl:d{distance}:{effort}"
 		key = f"{arg}@{hsh}"
 		if key not in r_map :
 			c_lst.append(arg)
-for speed in range(10) :
-	for quality in [100, 99, 98, 97, 96, 95, 94, 92, 90, 88, 86, 84, 80, 76, 72, 68, 64, 60] :
+for speed in range(11) :
+	for quality in [100, 99, 98, 97, 96, 95, 94, 92, 90, 88, 86, 84, 80, 78, 76, 74, 72, 70, 68, 64, 60, 55, 50, 45] :
 		arg = f"avif:q{quality}:s{speed}"
 		key = f"{arg}@{hsh}"
 		if key not in r_map :
@@ -105,21 +128,46 @@ if False :
 
 if True :
 	fig = plt.figure()
-	ax = fig.add_subplot(projection='3d')
+	ax3 = fig.add_subplot(1, 2, 1, projection='3d')
+	ax2 = fig.add_subplot(1, 2, 2)
 	for k in ['avif', 'jxl'] :
+		effort_map = collections.defaultdict(lambda : {'bpp': dict(), 'spd': dict(), 'score': dict()})
 		x_lst, y_lst, z_lst = list(), list(), list()
 		for key, score in r_map.items() :
 			if key.startswith(k) :
-				x_lst.append(score.bpp)
-				y_lst.append(score.enc_spd)
+				if k == 'avif' :
+					effort = int(key.split('@')[0].split(':')[2][1:])
+					quality = int(int(key.split('@')[0].split(':')[1][1:]))
+				elif k == 'jxl' :
+					effort = effort_lst.index(key.split('@')[0].split(':')[-1])
+					quality = float(key.split('@')[0].split(':')[1][1:])
+				effort_map[effort]['bpp'][quality] = math.log(score.bpp)
+				effort_map[effort]['spd'][quality] = math.log(score.enc_spd)
+				effort_map[effort]['score'][quality] = score.ssimulacra2
+				x_lst.append(math.log(score.bpp))
+				y_lst.append(math.log(score.enc_spd))
 				z_lst.append(score.ssimulacra2)
-		ax.plot_trisurf(x_lst, y_lst, z_lst, alpha=0.7)
-	ax.set_xlabel('bpp')
-	ax.set_ylabel('enc_spd')
-	ax.set_zlabel('ssimulacra2')
+		ax3.plot_trisurf(x_lst, y_lst, z_lst, alpha=0.6666)
+		for effort in effort_map :
+			x_lst = [effort_map[effort]['bpp'][quality] for quality in sorted(effort_map[effort]['bpp'])]
+			y_lst = [effort_map[effort]['spd'][quality] for quality in sorted(effort_map[effort]['spd'])]
+			z_lst = [effort_map[effort]['score'][quality] for quality in sorted(effort_map[effort]['score'])]
+			if k == 'avif' :
+				ax3.plot(x_lst, y_lst, z_lst, '--')
+			elif k == 'jxl' :
+				ax3.plot(x_lst, y_lst, z_lst)
+			ax2.plot(x_lst, z_lst, '+-', color='tab:green' if k == 'jxl' else 'tab:red')
+	ax2.grid()
+	# ax2.set_xscale('log')
+
+	ax2.set_xlabel('log(bpp)')
+	ax2.set_ylabel('score')
+
+	ax3.set_xlabel('log(bpp)')
+	ax3.set_ylabel('log(spd)')
+	ax3.set_zlabel('score')
 
 	plt.show()
-
 
 if False :
 	p_lst = list()
