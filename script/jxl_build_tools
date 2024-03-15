@@ -28,10 +28,10 @@ pushd $JXL_root_DIR/build
 	pushd ${build_dir}
 		case $1 in 
 			'native')
-				cmake -DCMAKE_CXX_FLAGS="-O3 -march=native -mtune=native" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF $source_dir
+				cmake -DCMAKE_CXX_FLAGS="-O3 -march=native -mtune=native" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_DEVTOOLS=ON $source_dir
 				;;
 			'generic')
-				cmake -DCMAKE_CXX_FLAGS="-march=x86-64 -mtune=generic" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF $source_dir
+				cmake -DCMAKE_CXX_FLAGS="-march=x86-64 -mtune=generic" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_DEVTOOLS=ON $source_dir
 				;;
 			*)
 				echo "you must specify native or generic"
