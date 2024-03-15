@@ -14,6 +14,7 @@ pushd ${build_DIR}
 	cmake --install-prefix=${root_DIR} \
 		-DCMAKE_CXX_FLAGS="-O3 -march=native -mtune=native" \
 		-DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+		-DJPEGXL_ENABLE_DEVTOOLS=ON \
 		${source_DIR}
 	make
 	make install

@@ -13,7 +13,7 @@ mkdir ${build_DIR}
 pushd ${build_DIR}
 	cmake --install-prefix=${root_DIR} \
 		-DCMAKE_CXX_FLAGS="-O3 -march=native -mtune=native" \
-		-DAVIF_CODEC_AOM=SYSTEM -DAVIF_BUILD_APPS=ON \
+		-DAVIF_CODEC_AOM=SYSTEM -DAVIF_BUILD_APPS=ON -DAVIF_LIBYUV=SYSTEM\
 		${source_DIR}
 	make
 	make install

@@ -13,172 +13,196 @@ from cc_pathlib import Path
 
 jxl_root_dir = Path(os.environ['JXL_root_DIR'])
 
-class JxlBench() :
-	effort_lst = [
-		"lightning",
-		"thunder",
-		"falcon",
-		"cheetah",
-		"hare",
-		"wombat",
-		"squirrel",
-		"kitten",
-		"tortoise",
-		"glacier"
-	]
+"""
+un fichier par image, nommé d'après le checksum
+"""
 
-	def __init__(self, distance, effort) :
-		self.distance = float(distance)
-		self.effort = int(effort)
 
-		assert 0 <= self.effort < len(self.effort_lst)
+jxl_effort_lst = [
+	"lightning",
+	"thunder",
+	"falcon",
+	"cheetah",
+	"hare",
+	"wombat",
+	"squirrel",
+	"kitten",
+	"tortoise",
+	"glacier"
+]
 
-	def __str__(self) :
-		return f"jxl:d{self.distance}:{self.effort_lst[self.effort]}"
 
-class AvifBench() :
-	def __init__(self, quality, speed) :
-		self.quality = int(quality)
-		self.speed = int(speed)
-		
-		assert 0 <= quality <= 100
-		assert 0 <= speed <= 10
-
-	def __str__(self) :
-		return f"avif:q{self.quality}:{self.speed}"
-
-benchmark_exe = jxl_root_dir / "root" / "bin" / "benchmark_xl"
+# def from_str(s) :
+# 	s_lst = s.split(':')
+# 	if s_lst[0] == 'jxl' :
+# 		return JxlBench(s_lst[1][1:], s_lst[2][1:])
+# 	elif s_lst[0] == 'avif' :
+# 		s_arg = {
+# 			'quality' : None,
+# 			'speed' : None,
+# 		}
+# 		for s in s_lst :
+# 			if s.startswith('q') :
+# 				s_arg['quality'] = int(s[1:])
+# 			elif s.startswith('s') :
+# 				s_arg['speed'] = int(s[1:])
+# 		return AvifBench(* s_arg)
+	
+def compute_hash(pth) :
+	return base64.urlsafe_b64encode(hashlib.blake2b(pth.read_bytes(), digest_size=24, salt=b'jxl').digest()).decode('ascii')
 
 # max norm is butteraugli, pnorm is the 3-norm butteraugli
 #Encoding              kPixels    Bytes          BPP  E MP/s  D MP/s     Max norm  SSIMULACRA2   PSNR        pnorm       BPP*pnorm   QABPP   Bugs
-Score = collections.namedtuple("Score", ['pixel_count', 'bytes', 'bpp', 'enc_spd', 'dec_spd', 'butteraugli', 'ssimulacra2', 'psnr', 'butteraugli3', 'pnorm_bpp', 'qa_bpp', 'bugs'])
+# Score = collections.namedtuple("Score", ['pixel_count', 'bytes', 'bpp', 'enc_spd', 'dec_spd', 'butteraugli', 'ssimulacra2', 'psnr', 'butteraugli3', 'pnorm_bpp', 'qa_bpp', 'bugs'])
 
-fnm = Path(sys.argv[1])
-hsh = base64.urlsafe_b64encode(hashlib.blake2b(fnm.read_bytes(), digest_size=24, salt=b'jxl').digest())
+class Benchmark() :
 
-pth = Path("result.tsv")
-r_map = dict()
-if pth.is_file() :
-	for key, * s_lst in pth.load() :
-		r_map[key] = Score(* [ast.literal_eval(s) for s in s_lst])
+	benchmark_exe = jxl_root_dir / "root" / "bin" / "benchmark_xl"
+	result_dir = jxl_root_dir / "benchmark" / "lossy" / "_result"
 
-c_lst = list()
-for effort in effort_lst :
-	for distance in [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.4, 1.5, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] :
-		arg = f"jxl:d{distance}:{effort}"
-		key = f"{arg}@{hsh}"
-		if key not in r_map :
-			c_lst.append(arg)
-for speed in range(11) :
-	for quality in [100, 99, 98, 97, 96, 95, 94, 92, 90, 88, 86, 84, 80, 78, 76, 74, 72, 70, 68, 64, 60, 55, 50, 45] :
-		arg = f"avif:q{quality}:s{speed}"
-		key = f"{arg}@{hsh}"
-		if key not in r_map :
-			c_lst.append(arg)
+	def __init__(self) :
 
-a_lst = c_lst[:8]
-while a_lst :
-	ret = Path().run(benchmark_exe, "--codec=" + ','.join(a_lst), f"--input={fnm}")
-	res = ret.stdout.decode('utf8')
+		self.c_set = set()
 
-	is_result = False
-	for line in res.splitlines() :
-		if line.startswith('----') :
-			is_result = True
-			continue
-		if line.startswith("Aggregate:") :
-			break
-		if is_result :
-			s_lst = line.split()
-			arg = s_lst.pop(0)
-			key = f"{arg}@{hsh}"
-			s_lst = [ast.literal_eval(s) for s in s_lst]
-			r_map[key] = Score(* s_lst)
+		avif_map = (self.result_dir / "avif.json").load()
+		for quality in avif_map['q'] :
+			for speed in avif_map['s'] :
+				self.c_set.add(f"avif:q{quality}:s{speed}")
 
-	a_lst = c_lst[:8]
-	c_lst = c_lst[8:]
+		jxl_map = (self.result_dir / "jxl.json").load()
+		for distance in jxl_map['d'] :
+			for effort in jxl_map['e'] :
+				self.c_set.add(f"jxl:d{distance}:{jxl_effort_lst[effort]}")
 
-	pth.save(
-		[[key,] + list(r_map[key]) for key in sorted(r_map)]
-	)
+		print(len(self.c_set))
+		
+	def run(self, image_pth) :
 
-import numpy as np
-import plotly.graph_objects as go
-import matplotlib.pyplot as plt
+		image_pth = Path(image_pth).resolve()
+		image_hsh = compute_hash(image_pth)
 
-if False :
-	fig = plt.figure()
-	ax = fig.add_subplot(projection='3d')
+		result_pth = self.result_dir / f"{image_hsh}.tsv"
+		if result_pth.is_file() :
+			result_lst = result_pth.load()
+		else :
+			result_lst = list()
 
-	for k in ['avif', 'jxl'] :
-		x_lst, y_lst, z_lst = list(), list(), list()
-		for key, score in r_map.items() :
-			if key.startswith(k) :
-				x_lst.append(score.bpp)
-				y_lst.append(score.enc_spd)
-				z_lst.append(score.ssimulacra2)
-		print(len(x_lst))
-		ax.scatter(x_lst, y_lst, z_lst)
+		d_set = set([line[0] for line in result_lst if not line[0].startswith('#')]) # set of benchmarks already done
 
-	ax.set_xlabel('bpp')
-	ax.set_ylabel('enc_spd')
-	ax.set_zlabel('ssimulacra2')
+		c_lst = sorted(self.c_set - d_set)
+		a_lst = c_lst[:8]
+		while a_lst :
+			ret = Path().run(self.benchmark_exe, "--codec=" + ','.join(str(a) for a in a_lst), f"--input={image_pth}")
+			res = ret.stdout.decode('utf8')
 
-	plt.show()
+			is_result = False
+			for line in res.splitlines() :
+				if line.startswith('----') :
+					is_result = True
+					continue
+				if line.startswith("Aggregate:") :
+					break
+				if is_result :
+					s_lst = line.split()
+					codec = s_lst.pop(0)
+					pixels, bytes, bpp, enc_spd, dec_spd, butteraugli_m, ssimulacra2, psnr, butteraugli_3, pnorm_bpp, qa_bpp, bugs = s_lst
+					if not result_pth.is_file() :
+						result_pth.write_text(''.join([
+							f'#\t{image_pth.relative_to(jxl_root_dir / "benchmark")}\t{image_pth.stat().st_size}\t{int(pixels) * 1000}\n',
+							'# codec\tsize\tenc_spd\tdec_spd\tssimulacra2\tbutteraugli_m\tbutteraugli_3\tpsnr\n'
+						]))
+					with result_pth.open('at') as fid :
+						fid.write('\t'.join([codec, bytes, enc_spd, dec_spd, ssimulacra2, butteraugli_m, butteraugli_3, psnr]) + '\n')
 
-if True :
-	fig = plt.figure()
-	ax3 = fig.add_subplot(1, 2, 1, projection='3d')
-	ax2 = fig.add_subplot(1, 2, 2)
-	for k in ['avif', 'jxl'] :
-		effort_map = collections.defaultdict(lambda : {'bpp': dict(), 'spd': dict(), 'score': dict()})
-		x_lst, y_lst, z_lst = list(), list(), list()
-		for key, score in r_map.items() :
-			if key.startswith(k) :
-				if k == 'avif' :
-					effort = int(key.split('@')[0].split(':')[2][1:])
-					quality = int(int(key.split('@')[0].split(':')[1][1:]))
-				elif k == 'jxl' :
-					effort = effort_lst.index(key.split('@')[0].split(':')[-1])
-					quality = float(key.split('@')[0].split(':')[1][1:])
-				effort_map[effort]['bpp'][quality] = math.log(score.bpp)
-				effort_map[effort]['spd'][quality] = math.log(score.enc_spd)
-				effort_map[effort]['score'][quality] = score.ssimulacra2
-				x_lst.append(math.log(score.bpp))
-				y_lst.append(math.log(score.enc_spd))
-				z_lst.append(score.ssimulacra2)
-		ax3.plot_trisurf(x_lst, y_lst, z_lst, alpha=0.6666)
-		for effort in effort_map :
-			x_lst = [effort_map[effort]['bpp'][quality] for quality in sorted(effort_map[effort]['bpp'])]
-			y_lst = [effort_map[effort]['spd'][quality] for quality in sorted(effort_map[effort]['spd'])]
-			z_lst = [effort_map[effort]['score'][quality] for quality in sorted(effort_map[effort]['score'])]
-			if k == 'avif' :
-				ax3.plot(x_lst, y_lst, z_lst, '--')
-			elif k == 'jxl' :
-				ax3.plot(x_lst, y_lst, z_lst)
-			ax2.plot(x_lst, z_lst, '+-', color='tab:green' if k == 'jxl' else 'tab:red')
-	ax2.grid()
-	# ax2.set_xscale('log')
+			a_lst = c_lst[:8]
+			c_lst = c_lst[8:]
 
-	ax2.set_xlabel('log(bpp)')
-	ax2.set_ylabel('score')
+		# with (self.result_dir / "corpus.json").config() as cfg :
+		# 	cfg[str(image_pth)] = [image_hsh, pixels, bytes]
 
-	ax3.set_xlabel('log(bpp)')
-	ax3.set_ylabel('log(spd)')
-	ax3.set_zlabel('score')
+if __name__ == '__main__' :
+	b = Benchmark()
+	for arg in sys.argv[1:] :
+		b.run(arg)
 
-	plt.show()
 
-if False :
-	p_lst = list()
-	for k, c in [('avif', 'orange'), ('jxl', 'blue')] :
-		x_lst, y_lst, z_lst = list(), list(), list()
-		for key, score in r_map.items() :
-			if key.startswith(k) :
-				x_lst.append(score.bpp)
-				y_lst.append(score.enc_spd)
-				z_lst.append(score.ssimulacra2)
-		p_lst.append(go.Mesh3d(x=x_lst, y=y_lst, z=z_lst, color=c))
-	fig = go.Figure(data=p_lst)
-	fig.show()
+# import numpy as np
+# import plotly.graph_objects as go
+# import matplotlib.pyplot as plt
+
+# if False :
+# 	fig = plt.figure()
+# 	ax = fig.add_subplot(projection='3d')
+
+# 	for k in ['avif', 'jxl'] :
+# 		x_lst, y_lst, z_lst = list(), list(), list()
+# 		for key, score in r_map.items() :
+# 			if key.startswith(k) :
+# 				x_lst.append(score.bpp)
+# 				y_lst.append(score.enc_spd)
+# 				z_lst.append(score.ssimulacra2)
+# 		print(len(x_lst))
+# 		ax.scatter(x_lst, y_lst, z_lst)
+
+# 	ax.set_xlabel('bpp')
+# 	ax.set_ylabel('enc_spd')
+# 	ax.set_zlabel('ssimulacra2')
+
+# 	plt.show()
+
+# if True :
+# 	fig = plt.figure()
+# 	ax3 = fig.add_subplot(1, 2, 1, projection='3d')
+# 	ax2 = fig.add_subplot(1, 2, 2)
+# 	for k in ['avif', 'jxl'] :
+# 		effort_map = collections.defaultdict(lambda : {'bpp': dict(), 'spd': dict(), 'score': dict()})
+# 		x_lst, y_lst, z_lst = list(), list(), list()
+# 		for key, score in r_map.items() :
+# 			if key.startswith(k) :
+# 				if k == 'avif' :
+# 					effort = int(key.split('@')[0].split(':')[2][1:])
+# 					quality = int(int(key.split('@')[0].split(':')[1][1:]))
+# 				elif k == 'jxl' :
+# 					effort = effort_lst.index(key.split('@')[0].split(':')[-1])
+# 					quality = float(key.split('@')[0].split(':')[1][1:])
+# 				effort_map[effort]['bpp'][quality] = math.log(score.bpp)
+# 				effort_map[effort]['spd'][quality] = math.log(score.enc_spd)
+# 				effort_map[effort]['score'][quality] = score.ssimulacra2
+# 				x_lst.append(math.log(score.bpp))
+# 				y_lst.append(math.log(score.enc_spd))
+# 				z_lst.append(score.ssimulacra2)
+# 		ax3.plot_trisurf(x_lst, y_lst, z_lst, alpha=0.6666)
+# 		for effort in effort_map :
+# 			x_lst = [effort_map[effort]['bpp'][quality] for quality in sorted(effort_map[effort]['bpp'])]
+# 			y_lst = [effort_map[effort]['spd'][quality] for quality in sorted(effort_map[effort]['spd'])]
+# 			z_lst = [effort_map[effort]['score'][quality] for quality in sorted(effort_map[effort]['score'])]
+# 			if k == 'avif' :
+# 				ax3.plot(x_lst, y_lst, z_lst, '--')
+# 			elif k == 'jxl' :
+# 				ax3.plot(x_lst, y_lst, z_lst)
+# 			ax2.plot(x_lst, z_lst, '+-', color='tab:green' if k == 'jxl' else 'tab:red')
+# 	ax2.grid()
+# 	# ax2.set_xscale('log')
+
+# 	ax2.set_xlabel('log(bpp)')
+# 	ax2.set_ylabel('score')
+
+# 	ax3.set_xlabel('log(bpp)')
+# 	ax3.set_ylabel('log(spd)')
+# 	ax3.set_zlabel('score')
+
+# 	plt.show()
+
+# if False :
+# 	p_lst = list()
+# 	for k, c in [('avif', 'orange'), ('jxl', 'blue')] :
+# 		x_lst, y_lst, z_lst = list(), list(), list()
+# 		for key, score in r_map.items() :
+# 			if key.startswith(k) :
+# 				x_lst.append(score.bpp)
+# 				y_lst.append(score.enc_spd)
+# 				z_lst.append(score.ssimulacra2)
+# 		p_lst.append(go.Mesh3d(x=x_lst, y=y_lst, z=z_lst, color=c))
+# 	fig = go.Figure(data=p_lst)
+# 	fig.show()
 		
