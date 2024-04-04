@@ -10,12 +10,17 @@ import matplotlib.pyplot as plt
 import collections
 
 if True :
-    u = (plt.imread("factorio.png")[:,:,1] * 256).clip(0, 255).astype(np.uint8)
+    u = (plt.imread(sys.argv[1])[:,:,1] * 256).clip(0, 255).astype(np.uint8)
     h, w = u.shape
 
 else :
     w, h = 1920, 1080
     u = (256 * np.random.random((h, w))).astype(np.uint8)
+
+plt.imshow(u)
+plt.show()
+
+print(w, h, u)
 
 color_lst = plt.rcParams['axes.prop_cycle'].by_key()['color']
 print(color_lst)
@@ -46,12 +51,10 @@ for x in range(r, h-r) :
         v = bytes([u[x+i, y+j] for i, j in v_lst])
         v_map[v].add((x, y))
 
-
 lb_lst = [(0, None),] * len(color_lst)
 
 for v in v_map :
     if len(v_map[v]) > 1 :
-        
         if len(v_map[v]) >= lb_lst[0][0] :
             lb_lst[0] = ((len(v_map[v]), v))
             lb_lst.sort()
