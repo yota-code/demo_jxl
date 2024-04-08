@@ -1,5 +1,10 @@
 #!/usr/bin/env zsh
 
+if [[ ! -d ${JXL_root_DIR} ]]
+then
+	echo "please source project"
+fi
+
 source_DIR=${JXL_root_DIR}/repo/libjxl
 build_DIR=${JXL_root_DIR}/build/libjxl
 root_DIR=${JXL_root_DIR}/root
@@ -16,6 +21,6 @@ pushd ${build_DIR}
 		-DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
 		-DJPEGXL_ENABLE_DEVTOOLS=ON \
 		${source_DIR}
-	make
+	make -j 4
 	make install
 popd

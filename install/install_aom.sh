@@ -1,5 +1,10 @@
 #!/usr/bin/env zsh
 
+if [[ ! -d ${JXL_root_DIR} ]]
+then
+	echo "please source project"
+fi
+
 source_DIR=${JXL_root_DIR}/repo/libaom
 build_DIR=${JXL_root_DIR}/build/libaom
 root_DIR=${JXL_root_DIR}/root
