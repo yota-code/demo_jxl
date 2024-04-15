@@ -1,69 +1,78 @@
 #!/usr/bin/env python3
 
+import collections
 import math
 import random
 import sys
 
+import imageio.v3 as iio
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-import collections
+from cc_pathlib import Path
 
-if True :
-    u = (plt.imread(sys.argv[1])[:,:,1] * 256).clip(0, 255).astype(np.uint8)
-    h, w = u.shape
+i_pth = Path("i_map.pickle")
 
+img = iio.imread(sys.argv[1])
+if img.dtype != np.uint8 :
+	img = (img * 255).round().clip(0, 255).astype(np.uint8)
+h, w, d = img.shape
+
+print(h, w, d, img.dtype)
+
+block_size = 12
+
+if not i_pth.is_file() :
+
+	# plt.imshow(img)
+	# plt.show()
+
+	p_lst = list()
+	for r in range(h-block_size) :
+		for c in range(w-block_size) :
+			p_lst.append((r, c))
+	random.seed(0)
+	random.shuffle(p_lst)
+
+	i_map = collections.defaultdict(list)
+
+	print("SCANNING...")
+
+	for r, c in p_lst :
+		e = hash(img[r:r+block_size, c:c+block_size].tobytes()) & 0xFFFF_FFFF
+		i_map[e].append((r, c))
+
+	print("DONE!")
+
+	e_lst = list(i_map)
+	for e in e_lst :
+		if len(i_map[e]) <= 3 :
+			del i_map[e]
+
+	i_pth.save(i_map)
 else :
-    w, h = 1920, 1080
-    u = (256 * np.random.random((h, w))).astype(np.uint8)
+	i_map = i_pth.load()
 
-plt.imshow(u)
-plt.show()
-
-print(w, h, u)
+print(i_map)
 
 color_lst = plt.rcParams['axes.prop_cycle'].by_key()['color']
-print(color_lst)
+
+lb_lst = [(0, None),] * len(color_lst)
+for e in i_map :
+	if len(i_map[e]) > 1 :
+		lb_lst.append((len(i_map[e]), e))
+		lb_lst = sorted(lb_lst)[-len(color_lst):]
+
+print(lb_lst)
 
 plt.figure()
 
-r = 4
-
-if False :
-    for i, c in enumerate(color_lst[:-1]) :
-        # r = random.randrange(2, 8)
-        px, py = random.randrange(r, h-r), random.randrange(r, w-r)
-        m = 1 + (int((random.random() * 10.0)**2) // 10)
-        print(m)
-        for j in range(m) :
-            qx, qy = random.randrange(r, h-r), random.randrange(r, w-r)
-            u[qx-r:qx+r,qy-r:qy+r] = u[px-r:px+r,py-r:py+r]
-            plt.plot([py-r, py+r, py+r, py-r, py-r], [px-r, px-r, px+r, px+r, px-r], color=c)
-            plt.plot([qy-r, qy+r, qy+r, qy-r, qy-r], [qx-r, qx-r, qx+r, qx+r, qx-r], color=c)
-            plt.plot([py, qy], [px, qx], color=c)
-
-v_lst = [(0, 0), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
-
-v_map = collections.defaultdict(set)
-for x in range(r, h-r) :
-    print(x, h, end='\r')
-    for y in range(r, w-r) :
-        v = bytes([u[x+i, y+j] for i, j in v_lst])
-        v_map[v].add((x, y))
-
-lb_lst = [(0, None),] * len(color_lst)
-
-for v in v_map :
-    if len(v_map[v]) > 1 :
-        if len(v_map[v]) >= lb_lst[0][0] :
-            lb_lst[0] = ((len(v_map[v]), v))
-            lb_lst.sort()
-            
-print(lb_lst)
+plt.imshow(img)
 
 for i, (l, b) in enumerate(lb_lst) :
-    plt.plot([y for x, y in v_map[b]], [x for x, y in v_map[b]], 'x', color=color_lst[i])
+	plt.plot([y for x, y in i_map[b]], [x for x, y in i_map[b]], 'x', color=color_lst[i])
 
-plt.imshow(u)
-plt.show()   
 plt.savefig("similarities.png")
+
+plt.show()
