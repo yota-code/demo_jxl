@@ -9,6 +9,8 @@ export LD_LIBRARY_PATH=${PREFIX_DIR}/lib:$LD_LIBRARY_PATH
 
 export PKG_CONFIG_PATH=${PREFIX_DIR}/lib/pkgconfig
 
+export PYTHONPATH=${JXL_root_DIR}/package:$PYTHONPATH
+
 echo $JXL_root_DIR
 
 typeset -U PATH

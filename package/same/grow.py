@@ -28,17 +28,14 @@ class SameGrow() :
 
 		self.b_set.add(blip)
 
-	def _grow_one(self, way) :
+	def _grow_side(self, way) :
 		for br, bc, bh, bw in self.b_set :
 			if br == 0 :
 				return False
-			
 		r_set = set()
-
 		dr, dc, dh, dw = self.w_map[way]
 		for br, bc, bh, bw in self.b_set :
 			r_set.add(blip(br+dr, bc+dc, bh+dh, bw+dw))
-
 		return r_set
 
 	def check(self, r_set=None) :
@@ -54,12 +51,11 @@ class SameGrow() :
 			prev = curr
 
 	def grow(self) :
-		
 		e = True
 		while e :
 			e = False
 			for w in self.w_map :
-				r_set = self._grow_one(w)
+				r_set = self._grow_side(w)
 				if self.check(r_set) :
 					e = True
 					self.b_set = r_set 
