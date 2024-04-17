@@ -2,8 +2,10 @@
 
 import sys
 
+from cc_pathlib import Path
+
 import same.scan
 
+p = Path(sys.argv[1]).resolve()
 u = same.scan.SameScan()
-u.scan(sys.argv[1])
-
+r = u.scan(p)

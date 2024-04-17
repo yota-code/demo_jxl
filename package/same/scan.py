@@ -7,15 +7,58 @@ import random
 import imageio.v3 as iio
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from cc_pathlib import Path
 
+def decimate_map(s_map, rate=1.0, min_rep=4) :
+
+	h_map = collections.defaultdict(int)
+
+	e_lst = list(s_map)
+	for e in e_lst :
+		# on vire les tous les qui ne sont pas répétés au moins <min_rep> fois
+		if min_rep <= len(s_map[e]) :
+			h_map[len(s_map[e])] += 1
+
+	h_min, h_max = min(h_map), max(h_map)
+	h_lst = [0,] * (h_max - h_min + 1)
+	for h in h_map :
+		h_lst[h - h_min] = h_map[h]
+
+	x_lst = list(range(h_min, h_max + 1))
+
+	# plt.figure()
+	if rate != 1.0 :
+		h_lim = max(h_lst) * rate
+
+		# plt.plot(x_lst, h_lst, '+--')
+		# plt.axhline(h_lim, color="tab:red")
+
+		for i in range(len(h_lst)) :
+			if h_lst[-1-i] > h_lim :
+				h_lst = h_lst[-i:]
+				x_lst = x_lst[-i:]
+				break
+	# plt.plot(x_lst, h_lst)
+	# plt.grid()
+	# plt.show()
+
+	print('----')
+	print(x_lst)
+	print(h_lst)
+
+	x_min = min(x_lst)
+	for e in e_lst :
+		if len(s_map[e]) < x_min :
+			del s_map[e]
+	
 class SameScan() :
 
 	block = 8
 	coverage = 1.0
 	seed = 0
-	repeat = 24 # discard blocks repeated less than <repeat> times
+	repeat = 4 # discard blocks repeated less than <repeat> times
 
 	# def __init__(self, cache_dir=None) :
 	# 	self.cache_dir = Path(cache_dir).resolve() if cache_dir is not None else None
@@ -60,10 +103,7 @@ class SameScan() :
 			e = hash(self.img[r:r+self.block, c:c+self.block].tobytes()) & 0xFFFF_FFFF
 			s_map[e].append((r, c))
 
-		e_lst = list(s_map)
-		for e in e_lst :
-			if len(s_map[e]) < self.repeat :
-				del s_map[e]
+		decimate_map(s_map, 0.2)
 
 		print("second pass")
 		z_map = collections.defaultdict(list)
@@ -72,10 +112,7 @@ class SameScan() :
 				e = self.img[r:r+self.block, c:c+self.block].tobytes()
 				z_map[base64.a85encode(e).decode('ascii')].append((r, c))
 
-		e_lst = list(z_map)
-		for e in e_lst :
-			if len(z_map[e]) < self.repeat :
-				del z_map[e]
+		decimate_map(z_map, 1.0)
 
 		print("save")
 		self.pth.with_suffix('.json').save(z_map, verbose=True)
