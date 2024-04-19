@@ -6,9 +6,7 @@ import collections
 take a list of blocks flagged as similar, try to expand them as much as possible while keeping them similar
 """
 
-blip = collections.NamedTuple('Blip', ['br', 'bc', 'bh', 'bw'])
-
-class SameGrow() :
+class PatchList() :
 
 	w_map = {
 		'up': [-1, 0, 1, 0],
@@ -17,46 +15,87 @@ class SameGrow() :
 		'right': [0, 0, 0, 1]
 	}
 
-	def __init__(self, arr) :
+	def __init__(self, rc_lst, height, width) :
+		self.rc_lst = rc_lst
+		self.height, self.width = height, width
 
-		self.arr = arr
-		self.h, self.w, self.d = arr.shape
+	def __iter__(self) :
+		for r, c in self.rc_lst :
+			yield r, c
 
-		self.b_set = set()
-
-	def push(self, blip) :
-
-		self.b_set.add(blip)
-
-	def _grow_side(self, way) :
-		for br, bc, bh, bw in self.b_set :
-			if br == 0 :
-				return False
-		r_set = set()
+	def grow(self, way) :
+		# return a new class
+		for br, bc in self.rc_lst :
+			if br == 0 and way == 'up' :
+				raise ValueError
+			if bc == 0 and way == 'left' :
+				raise ValueError
+			
 		dr, dc, dh, dw = self.w_map[way]
-		for br, bc, bh, bw in self.b_set :
-			r_set.add(blip(br+dr, bc+dc, bh+dh, bw+dw))
-		return r_set
 
-	def check(self, r_set=None) :
-		if r_set is None :
-			r_set = self.b_set
+		rc_lst = list()
+		width = self.width + dw
+		height = self.height + dh
+		for br, bc in self.rc_lst :
+			rc_lst.append((br+dr, bc+dc))
 
+		return PatchList(rc_lst, height, width)
+
+class SameGrow() :
+
+	def __init__(self, img, rc_lst, height, width) :
+
+		self.img = img
+		self.h, self.w, self.d = img.shape
+
+		self.p_lst = PatchList(rc_lst, height, width)
+
+	def check(self, p_lst=None) :
+
+		if p_lst is None :
+			p_lst = self.p_lst
+
+		print(">>>", p_lst.rc_lst, p_lst.height, p_lst.width, end='\t')
+		
 		prev = None
-		for br, bc, bh, bw in r_set :
-			curr = self.arr[br:br+bh, bc:bc+bw]
+		bh, bw = p_lst.height, p_lst.width
+		for br, bc in p_lst :
+			curr = self.img[br:br+bh, bc:bc+bw, :]
 			if prev is not None :
 				if not (prev == curr).all() :
+					print("FAILURE")
 					return False
 			prev = curr
+		print("SUCCESS")
+		return True
 
 	def grow(self) :
 		e = True
 		while e :
 			e = False
-			for w in self.w_map :
-				r_set = self._grow_side(w)
-				if self.check(r_set) :
+			print("----")
+			for w in PatchList.w_map :
+				try :
+					q_lst = self.p_lst.grow(w)
+				except ValueError :
+					e = False
+					break
+				if self.check(q_lst) :
+					print(f"grow {w} SUCCESS")
 					e = True
-					self.b_set = r_set 
-			
+					self.p_lst = q_lst
+				else :
+					print(f"grow {w} FAILURE")
+
+	def plot(self) :
+		import matplotlib.pyplot as plt
+
+		plt.figure()
+		plt.imshow(self.img)
+		h, w = self.p_lst.height, self.p_lst.width
+		for r, c in self.p_lst :
+			print(r, c, h, w)
+			plt.plot([c-0.5, c+w-0.5, c+w-0.5, c-0.5, c-0.5], [r-0.5, r-0.5, r+h-0.5, r+h-0.5, r-0.5], color='tab:blue')
+
+		plt.grid()
+		plt.show()
