@@ -5,6 +5,9 @@ import hashlib
 import tempfile
 import sys
 
+import numpy as np
+
+import matplotlib
 import matplotlib.pyplot as plt
 
 """ test images at incremental distances """
@@ -14,10 +17,9 @@ from cc_pathlib import Path
 class IncrementalDistance() :
 	def __init__(self, cwd=None) :
 		self.cwd = (Path() if cwd is None else Path(cwd)).resolve()
-		
-		self.r_pth = self.cwd / "incremental_distance.pickle.br"
-		self.r_map = self.r_pth.load() if self.r_pth.is_file() else dict()
-		# hkey -> args -> dist -> [size, score]
+		# self.r_pth = self.cwd / "incremental_distance.pickle.br"
+		# self.r_map = self.r_pth.load() if self.r_pth.is_file() else dict()
+		# hkey -> other_args -> effort -> distance -> [size, score]
 		
 	def get_hkey(self, src_pth) :
 		hsh = hashlib.blake2b(src_pth.read_bytes(), digest_size=24).digest()
@@ -34,56 +36,118 @@ class IncrementalDistance() :
 		return '_'.join(a_lst), c_lst
 		
 	def run(self, src_pth, dist, ** args) :
-	
+
+		src_pth = Path(src_pth).resolve()
 		hkey = self.get_hkey(src_pth)
-		if hkey not in self.r_map :
-			self.r_map[hkey] = dict()
-		a_map = self.r_map[hkey]
+		
+		a_pth = self.cwd / f"{hkey}.pickle.br"
+		a_map = a_pth.load() if a_pth.is_file() else dict()
+
+		# print("\nA_MAP\n", hkey, a_map)
 			
 		akey, c_lst = self.args_to_line(** args)
 		if akey not in a_map :
 			a_map[akey] = dict()
-		d_map = a_map[akey] # {int(k) : v for k, v in a_map[akey].items()}
-			
+		e_map = a_map[akey] # {int(k) : v for k, v in a_map[akey].items()}
+
+		# print("\nE_MAP\n", akey, e_map)
+
 		with tempfile.TemporaryDirectory('jxl_inc') as tmp :
 			tmp_dir = Path(tmp)
 			dst_pth = tmp_dir / "i.jxl"
-			for i in range(10, dist.stop)[dist] :
-				d = f"{i / 1000}"
-				if d in d_map :
-					continue
-				if a_map is None :
-					a_map = dict()
-				tmp_dir.run('cjxl', '-d', d, * c_lst, src_pth, dst_pth)
-				ret = tmp_dir.run('ssimulacra2', src_pth, dst_pth)
-				d_map[i] = [dst_pth.stat().st_size, float(ret.stdout.decode('utf8'))]
-				print(d, d_map[i])
+			for e in range(1, 11) :
+				if e not in e_map :
+					e_map[e] = dict()
+				d_map = e_map[e]
+
+				# print("\nD_MAP\n", e, d_map)
+
+				for i in range(10, dist.stop)[dist] :
+					d = f"{i / 1000}"
+					if i in d_map :
+						continue
+					tmp_dir.run('cjxl', '-d', d, '-e', e, * c_lst, src_pth, dst_pth)
+					ss_score = float(tmp_dir.run('ssimulacra2', src_pth, dst_pth).stdout.decode('utf8'))
+					ba_score = float(tmp_dir.run('butteraugli_main', src_pth, dst_pth).stdout.decode('utf8').splitlines()[0])
+					d_map[i] = [dst_pth.stat().st_size, ss_score, ba_score]
+					print(d, d_map[i])
 				
-		self.r_pth.save(self.r_map)
-		self.r_pth.with_suffix('.py').write_text(repr(self.r_map))
+		a_pth.save(a_map)
+		a_pth.with_suffix('.json').save(a_map)
 		
-	def plot(self, src_pth) :
+	def plot(self, src_pth, is_3d=False) :
+
+		src_pth = Path(src_pth).resolve()
 		hkey = self.get_hkey(src_pth)
+		
+		a_pth = self.cwd / f"{hkey}.pickle.br"
+		a_map = a_pth.load()
+
+		if is_3d :
+			ax = plt.figure().add_subplot(projection='3d')
+		else :
+			plt.figure()
+
+		#color_lst = matplotlib.colormaps['viridis']
+		color_lst = matplotlib.colormaps['tab10']
 			
-		a_map = self.r_map[hkey]
 		for akey in a_map :
-			d_map = a_map[akey]
-			s_lst, z_lst = list(), list()
-			d_lst = sorted(d_map)
-			for d in d_lst :
-				s_lst.append(d_map[d][0])
-				z_lst.append(d_map[d][1])
-			plt.plot(d_lst, s_lst, label=akey)
-			
-		plt.legend()
-		plt.grid()
+			e_map = a_map[akey]
+			e_lst = sorted(e_map)
+			for e in e_lst :
+				if e not in [4, 8] :
+					continue 
+				d_map = e_map[e]
+				d_lst = sorted(d_map)
+				d_arr = np.array(d_lst) / 1000.0
+				s_lst, z_lst = list(), list()
+				for d in d_lst :
+					s_lst.append(d_map[d][0])
+					z_lst.append(d_map[d][2])
+				if is_3d :
+					ax.plot(d_arr, s_lst, z_lst, label=f'e{e} ' + akey, color=color_lst(e / 10.0))
+				else :
+					plt.subplot(2, 2, 1)
+					plt.plot(d_arr, s_lst, label=f'e{e} ' + akey, color=color_lst(e-1))
+
+					plt.subplot(2, 2, 2)
+					plt.plot(z_lst, s_lst, label=f'e{e} ' + akey, color=color_lst(e-1))
+
+					plt.subplot(2, 2, 3)
+					plt.plot(d_arr, z_lst, label=f'e{e} ' + akey, color=color_lst(e-1))
+
+		if is_3d :
+			ax.set_xlabel('distance')
+			ax.set_ylabel('size')
+			ax.set_zlabel('score')
+			# plt.legend()
+			plt.grid()
+		else :
+			plt.subplot(2, 2, 1)
+			plt.xlabel('distance')
+			plt.ylabel('size')
+			plt.yscale('log')
+			# plt.legend()
+			plt.grid()
+			plt.subplot(2, 2, 2)
+			plt.xlabel('score')
+			plt.ylabel('size')
+			plt.yscale('log')
+			# plt.legend()
+			plt.grid()
+			plt.subplot(2, 2, 3)
+			plt.xlabel('distance')
+			plt.ylabel('score')
+			plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+			plt.grid()
+
+		# plt.tight_layout()
 		plt.show()
 		
 if __name__ == '__main__' :
 	src_pth = Path(sys.argv[1]).resolve()
 	u = IncrementalDistance()
-	for e in range(1, 10) :
-		u.run(src_pth, slice(0, 1000, 5), e=e)
+	u.run(src_pth, slice(10, 1000, 5))
 	u.plot(src_pth)
 		
 
