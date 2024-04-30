@@ -14,16 +14,17 @@ import matplotlib.pyplot as plt
 
 from cc_pathlib import Path
 
-class IncrementalDistance() :
+class JxlPrep() :
 	def __init__(self, cwd=None) :
-		self.cwd = (Path() if cwd is None else Path(cwd)).resolve()
+		# self.cwd = (Path(__file__) if cwd is None else Path(cwd)).resolve()
+		self.cwd = Path(__file__).resolve().parent
 		# self.r_pth = self.cwd / "incremental_distance.pickle.br"
 		# self.r_map = self.r_pth.load() if self.r_pth.is_file() else dict()
 		# hkey -> other_args -> effort -> distance -> [size, score]
 		
 	def get_hkey(self, src_pth) :
 		hsh = hashlib.blake2b(src_pth.read_bytes(), digest_size=24).digest()
-		key = base64.urlsafe_b64encode(hsh)
+		key = base64.urlsafe_b64encode(hsh).decode('ascii')
 		return key
 		
 	def args_to_line(self, ** args) :
@@ -40,17 +41,14 @@ class IncrementalDistance() :
 		src_pth = Path(src_pth).resolve()
 		hkey = self.get_hkey(src_pth)
 		
-		a_pth = self.cwd / f"{hkey}.pickle.br"
-		a_map = a_pth.load() if a_pth.is_file() else dict()
+		a_pth = self.cwd / "jxl" / f"{hkey}.pickle.br"
 
-		# print("\nA_MAP\n", hkey, a_map)
+		a_map = a_pth.load() if a_pth.is_file() else dict()
 			
 		akey, c_lst = self.args_to_line(** args)
 		if akey not in a_map :
 			a_map[akey] = dict()
 		e_map = a_map[akey] # {int(k) : v for k, v in a_map[akey].items()}
-
-		# print("\nE_MAP\n", akey, e_map)
 
 		with tempfile.TemporaryDirectory('jxl_inc') as tmp :
 			tmp_dir = Path(tmp)
@@ -80,74 +78,77 @@ class IncrementalDistance() :
 		src_pth = Path(src_pth).resolve()
 		hkey = self.get_hkey(src_pth)
 		
-		a_pth = self.cwd / f"{hkey}.pickle.br"
+		a_pth = self.cwd / "jxl" / f"{hkey}.pickle.br"
 		a_map = a_pth.load()
-
-		if is_3d :
-			ax = plt.figure().add_subplot(projection='3d')
-		else :
-			plt.figure()
 
 		#color_lst = matplotlib.colormaps['viridis']
 		color_lst = matplotlib.colormaps['tab10']
 			
 		for akey in a_map :
+
+			print(akey)
+
+			if is_3d :
+				ax = plt.figure().add_subplot(projection='3d')
+			else :
+				plt.figure(figsize=(16, 9))
+			
+			plt.suptitle(f"{src_pth.name} {akey}")
+
 			e_map = a_map[akey]
 			e_lst = sorted(e_map)
 			for e in e_lst :
-				if e not in [4, 8] :
-					continue 
 				d_map = e_map[e]
 				d_lst = sorted(d_map)
 				d_arr = np.array(d_lst) / 1000.0
 				s_lst, z_lst = list(), list()
 				for d in d_lst :
 					s_lst.append(d_map[d][0])
-					z_lst.append(d_map[d][2])
+					z_lst.append(d_map[d][1])
 				if is_3d :
-					ax.plot(d_arr, s_lst, z_lst, label=f'e{e} ' + akey, color=color_lst(e / 10.0))
+					ax.plot(d_arr, s_lst, z_lst, label=f'e{e}', color=color_lst(e / 10.0))
 				else :
 					plt.subplot(2, 2, 1)
-					plt.plot(d_arr, s_lst, label=f'e{e} ' + akey, color=color_lst(e-1))
+					plt.plot(d_arr, s_lst, label=f'e{e}', color=color_lst(e-1))
 
 					plt.subplot(2, 2, 2)
-					plt.plot(z_lst, s_lst, label=f'e{e} ' + akey, color=color_lst(e-1))
+					plt.plot(z_lst, s_lst, label=f'e{e}', color=color_lst(e-1))
 
 					plt.subplot(2, 2, 3)
-					plt.plot(d_arr, z_lst, label=f'e{e} ' + akey, color=color_lst(e-1))
+					plt.plot(d_arr, z_lst, label=f'e{e}', color=color_lst(e-1))
 
-		if is_3d :
-			ax.set_xlabel('distance')
-			ax.set_ylabel('size')
-			ax.set_zlabel('score')
-			# plt.legend()
-			plt.grid()
-		else :
-			plt.subplot(2, 2, 1)
-			plt.xlabel('distance')
-			plt.ylabel('size')
-			plt.yscale('log')
-			# plt.legend()
-			plt.grid()
-			plt.subplot(2, 2, 2)
-			plt.xlabel('score')
-			plt.ylabel('size')
-			plt.yscale('log')
-			# plt.legend()
-			plt.grid()
-			plt.subplot(2, 2, 3)
-			plt.xlabel('distance')
-			plt.ylabel('score')
-			plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
-			plt.grid()
+			if is_3d :
+				ax.set_xlabel('distance')
+				ax.set_ylabel('size')
+				ax.set_zlabel('score')
+				# plt.legend()
+				plt.grid()
+			else :
+				plt.subplot(2, 2, 1)
+				plt.xlabel('distance')
+				plt.ylabel('size')
+				plt.yscale('log')
+				# plt.legend()
+				plt.grid()
+				plt.subplot(2, 2, 2)
+				plt.xlabel('score')
+				plt.ylabel('size')
+				plt.yscale('log')
+				# plt.legend()
+				plt.grid()
+				plt.subplot(2, 2, 3)
+				plt.xlabel('distance')
+				plt.ylabel('score')
+				plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+				plt.grid()
 
-		# plt.tight_layout()
-		plt.show()
+			plt.savefig(f"plot/{hkey}_{akey}.png")
+			plt.show()
 		
 if __name__ == '__main__' :
 	src_pth = Path(sys.argv[1]).resolve()
-	u = IncrementalDistance()
-	u.run(src_pth, slice(10, 1000, 5))
+	u = JxlPrep()
+	u.run(src_pth, slice(10, 1000, 5), gaborish=0)
 	u.plot(src_pth)
 		
 
