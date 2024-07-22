@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+#!/usr/bin/env python3
+
 import ast
 import base64
 import collections
@@ -20,101 +22,110 @@ jxl_root_dir = Path(os.environ['JXL_root_DIR'])
 un fichier résultat par image, nommé d'après le checksum
 """
 
-jxl_effort_lst = [
-	"lightning",
-	"thunder",
-	"falcon",
-	"cheetah",
-	"hare",
-	"wombat",
-	"squirrel",
-	"kitten",
-	"tortoise",
-	"glacier"
-]
-
-
-# def from_str(s) :
-# 	s_lst = s.split(':')
-# 	if s_lst[0] == 'jxl' :
-# 		return JxlBench(s_lst[1][1:], s_lst[2][1:])
-# 	elif s_lst[0] == 'avif' :
-# 		s_arg = {
-# 			'quality' : None,
-# 			'speed' : None,
-# 		}
-# 		for s in s_lst :
-# 			if s.startswith('q') :
-# 				s_arg['quality'] = int(s[1:])
-# 			elif s.startswith('s') :
-# 				s_arg['speed'] = int(s[1:])
-# 		return AvifBench(* s_arg)
-	
-def compute_hash(pth) :
-	return base64.urlsafe_b64encode(hashlib.blake2b(pth.read_bytes(), digest_size=24, salt=b'jxl').digest()).decode('ascii')
-
 # max norm is butteraugli, pnorm is the 3-norm butteraugli
 #Encoding              kPixels    Bytes          BPP  E MP/s  D MP/s     Max norm  SSIMULACRA2   PSNR        pnorm       BPP*pnorm   QABPP   Bugs
 # Score = collections.namedtuple("Score", ['pixel_count', 'bytes', 'bpp', 'enc_spd', 'dec_spd', 'butteraugli', 'ssimulacra2', 'psnr', 'butteraugli3', 'pnorm_bpp', 'qa_bpp', 'bugs'])
 
+
+class JxlCodec() :
+
+	key = 'jxl'
+	
+	jxl_settings = {
+		"d" : [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.4, 1.5, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
+		"e" : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+	}
+
+	# jxl_settings = {
+	# 	"d" : [0.1, 0.5, 1.0, 2.0],
+	# 	"e" : [1, 3, 5, 7]
+	# }
+
+
+	jxl_efforts = [
+		"lightning", "thunder", "falcon",
+		"cheetah", "hare", "wombat",
+		"squirrel", "kitten", "tortoise",
+		"glacier"
+	]
+
+	def __init__(self) :
+		self.version = Path().run("cjxl", "--version").stdout.decode('utf8').splitlines()[0]
+	
+	@property
+	def todo(self) :
+		b_set = set()
+		for distance in self.jxl_settings['d'] :
+			for effort in self.jxl_settings['e'] :
+				b_set.add(f"d{distance}:{self.jxl_efforts[effort]}")
+		return b_set
+	
+class AvifCodec() :
+
+	key = 'jxl'
+
+	avif_settings = {
+		"q" : [100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 88, 86, 84, 80, 78, 76, 74, 72, 70, 68, 64, 60, 55, 50],
+		"s" : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+	}
+
+	# avif_settings = {
+	# 	"q" : [100, 95, 92, 90],
+	# 	"s" : [3, 7, 10]
+	# }
+
+
+	def __init__(self) :
+		self.version = Path().run("avifenc", "--version").stdout.decode('utf8').splitlines()[0]
+
+	@property
+	def todo(self) :
+		b_set = set()
+		for quality in self.avif_settings['q'] :
+			for speed in self.avif_settings['s'] :
+				b_set.add(f"q{quality}:s{speed}")
+		return b_set
+
 class Benchmark() :
 
-	benchmark_exe = jxl_root_dir / "root" / "bin" / "benchmark_xl"
-	result_dir = jxl_root_dir / "benchmark" / "lossy" / "_result"
+	cwd = jxl_root_dir / "benchmark" / "lossy"
 
 	def __init__(self, image_pth) :
 
+		self.c_map = {
+			'jxl' : JxlCodec(),
+			'avif' : AvifCodec()
+		}
+
 		self.image_pth = Path(image_pth).resolve()
-		self.image_hsh = compute_hash(image_pth)
+		self.image_hsh = self.compute_hash(self.image_pth)	
 
-		result_pth = self.result_dir / f"{self.image_hsh}.tsv"
+		self.result_pth = self.cwd / "_result" / f"{self.image_hsh}.json"
 
-		image_iio = iio.imread(self.image_pth)
-		self.row, self.col, depth = image_iio.shape
+		if self.result_pth.is_file() :
+			self.result_map = self.result_pth.load()
+		else :
+			self.result_map = {'__info__': dict()}
+			image_iio = iio.imread(self.image_pth)
+			self.result_map['__info__']['shape'] = image_iio.shape
+			self.result_map['__info__']['size'] = self.image_pth.stat().st_size
+			self.result_pth.save(self.result_map, verbose=True)
 
-
-		self.b_set = set()
-
-		avif_map = (self.result_dir / "avif.json").load()
-		for quality in avif_map['q'] :
-			for speed in avif_map['s'] :
-				self.b_set.add(f"avif:q{quality}:s{speed}")
-
-		jxl_map = (self.result_dir / "jxl.json").load()
-		for distance in jxl_map['d'] :
-			for effort in jxl_map['e'] :
-				self.b_set.add(f"jxl:d{distance}:{jxl_effort_lst[effort]}")
-
-		print(len(self.b_set))
-
-	def _load_score(self, result_pth) :
-		# ne pas utiliser... on veut chronométrer plusieurs fois... pour différentes versions ?
-		result_lst = result_pth.load()
-		result_map = dict()
-		for line in result_lst :
-			if line.startswith('#') :
-				continue
-			k, v_lst = line.split('\t')
-			result_map[k] = [ast.literal_eval(v) for v in v_lst]
-		return result_map
-
-	def _save_score(self, result_pth) :
-		pass
-
+	def compute_hash(self, pth) :
+		return base64.urlsafe_b64encode(hashlib.blake2b(pth.read_bytes(), digest_size=24, salt=b'jxl').digest()).decode('ascii')
 		
 	def run(self) :
-		if self.result_pth.is_file() :
-			result_lst = self.result_pth.load()
-		else :
-			result_lst = dict()
+		c_set = set()
+		for k, codec in self.c_map.items() :
+			c_set |= set((k + ':' + v) for v in codec.todo - self.result_map[k].get(codec.version, dict()).keys())
+		c_lst = sorted(c_set)
 
-		# set of benchmarks already done
-		d_set = set([line[0] for line in result_lst if not line[0].startswith('#')])
+		print(c_lst, len(c_lst))
 
-		c_lst = sorted(self.b_set - d_set)
 		a_lst = c_lst[:8]
+
 		while a_lst :
-			ret = Path().run(self.benchmark_exe, "--codec=" + ','.join(str(a) for a in a_lst), f"--input={self.image_pth}")
+			ret = Path().run("benchmark_xl", "--codec=" + ','.join(str(a) for a in a_lst), f"--input={self.image_pth}")
 			res = ret.stdout.decode('utf8')
 
 			is_result = False
@@ -126,22 +137,20 @@ class Benchmark() :
 					break
 				if is_result :
 					s_lst = line.split()
-					codec = s_lst.pop(0)
+					m, * flags = s_lst.pop(0).split(':')
 					kpixels, bytes, bpp, enc_spd, dec_spd, butteraugli_m, ssimulacra2, psnr, butteraugli_3, pnorm_bpp, qa_bpp, bugs = s_lst
-					if not self.result_pth.is_file() :
-						self.result_pth.write_text(''.join([
-							f'# {self.image_pth.relative_to(jxl_root_dir / "benchmark" / "lossy")}\t{self.image_pth.stat().st_size}\t{self.row}\t{self.col}\n',
-							'# codec\tsize\tenc_spd\tdec_spd\tssimulacra2\tbutteraugli_m\tbutteraugli_3\tpsnr\n'
-						]))
-					with self.result_pth.open('at') as fid :
-						fid.write('\t'.join([codec, bytes, enc_spd, dec_spd, ssimulacra2, butteraugli_m, butteraugli_3, psnr]) + '\n')
+					with self.result_pth.config() as cfg :
+						if m not in cfg :
+							cfg[m] = dict()
+						codec = self.c_map[m]
+						if codec.version not in cfg[m] :
+							cfg[m][codec.version] = dict()
+						cfg[m][self.c_map[m].version][':'.join(flags)] = [
+							ast.literal_eval(i) for i in (bytes, enc_spd, dec_spd, ssimulacra2, butteraugli_m, butteraugli_3, psnr)
+						]
 
 			a_lst = c_lst[:8]
 			c_lst = c_lst[8:]
-
-		# with (self.result_dir / "corpus.json").config() as cfg :
-		# 	cfg[str(image_pth)] = [image_hsh, pixels, bytes]
-
 
 def plot(self, image_hsh) :
 	result_pth = self.result_dir / f"{image_hsh}.tsv"
@@ -165,11 +174,10 @@ def plot(self, image_hsh) :
 		
 		m = {'avif' : 'v', 'jxl': '^'}[c]
 
-
 if __name__ == '__main__' :
-	b = Benchmark()
+	
 	for arg in sys.argv[1:] :
-		b.run(arg)
+		b = Benchmark(arg).run()
 
 
 # import numpy as np
@@ -252,3 +260,4 @@ if __name__ == '__main__' :
 # 	fig = go.Figure(data=p_lst)
 # 	fig.show()
 		
+	
